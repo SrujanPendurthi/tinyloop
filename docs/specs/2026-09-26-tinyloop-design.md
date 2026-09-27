@@ -58,8 +58,8 @@ Each layer is a mixer (G or S) followed by an MoE FFN. Layer order per stage is 
 **S — NSA-style sparse attention**
 - GQA, 2 KV heads, `d_head = 64`.
 - Three branches:
-  - (a) compressed: one pooled key/value per 64-token block;
-  - (b) selected: full attention inside the top-16 blocks, scored by (a); the selection is shared across the query heads of a GQA group;
+  - (a) compressed: one pooled key/value per 64-token block, visible to a token only once the block is complete. A zero-logit sink slot keeps early tokens (no complete block yet) finite;
+  - (b) selected: full attention inside the top-16 blocks, scored by (a). In training and prefill, the selection is shared across the query heads of a GQA group **and across the 64 queries of a query block** (MoBA-style). Per-token selection would need a `[T, topk·64, d]` gather per head, about 4 GB at 16k tokens, which is not feasible without custom kernels. Decode selects per token (its query block is itself). A query block always selects its own block and never a future block;
   - (c) sliding window of 512 tokens.
 - A learned sigmoid gate per branch mixes the three.
 - NoPE (no positional encoding); position comes from DeltaNet's conv and recurrence.
